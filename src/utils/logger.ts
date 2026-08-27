@@ -1,7 +1,7 @@
 const REDACTED = "[REDACTED]";
 
 function secretValues(): string[] {
-  return [process.env.TELEGRAM_BOT_TOKEN, process.env.BOT_API_SECRET, process.env.WEBHOOK_SECRET]
+  return [process.env.TELEGRAM_BOT_TOKEN, process.env.WEBHOOK_SECRET]
     .filter((value): value is string => Boolean(value && value.trim()))
     .sort((a, b) => b.length - a.length);
 }

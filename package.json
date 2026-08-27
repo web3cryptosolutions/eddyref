@@ -2,7 +2,7 @@
   "name": "eddy-calls-telegram-bot",
   "version": "1.0.0",
   "private": true,
-  "description": "Production Telegram referral bot for the Eddy Calls SOL contest",
+  "description": "Telegram channel subscription bot with Stars payments",
   "type": "module",
   "engines": {
     "node": ">=20"

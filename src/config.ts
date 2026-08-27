@@ -5,9 +5,6 @@ dotenv.config();
 const REQUIRED_ENV_VARS = [
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_CHANNEL_ID",
-  "TELEGRAM_CHANNEL_USERNAME",
-  "LOVABLE_API_URL",
-  "BOT_API_SECRET",
   "TELEGRAM_BOT_USERNAME",
 ] as const;
 
@@ -19,20 +16,36 @@ function readRequired(name: (typeof REQUIRED_ENV_VARS)[number]): string {
   return value;
 }
 
-function normalizeUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new Error("LOVABLE_API_URL must be an http or https URL");
-    }
-    return parsed.toString().replace(/\/+$/, "");
-  } catch {
-    throw new Error("LOVABLE_API_URL must be a valid URL");
-  }
+function readOptional(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
 }
 
-function normalizeUsername(value: string): string {
-  return value.replace(/^@/, "").trim();
+function normalizeUsername(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/^@/, "").trim();
+  return normalized || undefined;
+}
+
+function readPositiveInt(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+export const PLAN_IDS = ["weekly", "monthly"] as const;
+export type PlanId = (typeof PLAN_IDS)[number];
+
+export interface Plan {
+  id: PlanId;
+  title: string;
+  days: number;
+  stars: number;
 }
 
 function loadConfig() {
@@ -40,24 +53,40 @@ function loadConfig() {
     readRequired(name);
   }
 
-  const telegramBotUsername = normalizeUsername(readRequired("TELEGRAM_BOT_USERNAME"));
-  const telegramChannelUsername = normalizeUsername(readRequired("TELEGRAM_CHANNEL_USERNAME"));
-  const channelIdRaw = readRequired("TELEGRAM_CHANNEL_ID");
+  const weekly: Plan = {
+    id: "weekly",
+    title: "Weekly",
+    days: readPositiveInt("WEEKLY_DAYS", 7),
+    stars: readPositiveInt("WEEKLY_STARS", 1000),
+  };
+  const monthly: Plan = {
+    id: "monthly",
+    title: "Monthly",
+    days: readPositiveInt("MONTHLY_DAYS", 30),
+    stars: readPositiveInt("MONTHLY_STARS", 2500),
+  };
 
   return {
     telegramBotToken: readRequired("TELEGRAM_BOT_TOKEN"),
-    telegramChannelId: channelIdRaw,
-    telegramChannelUsername,
-    lovableApiUrl: normalizeUrl(readRequired("LOVABLE_API_URL")),
-    botApiSecret: readRequired("BOT_API_SECRET"),
-    telegramBotUsername,
-    httpTimeoutMs: 10_000,
+    telegramChannelId: readRequired("TELEGRAM_CHANNEL_ID"),
+    telegramChannelUsername: normalizeUsername(readOptional("TELEGRAM_CHANNEL_USERNAME")),
+    telegramBotUsername: normalizeUsername(readRequired("TELEGRAM_BOT_USERNAME")) ?? "bot",
+    channelName: readOptional("CHANNEL_NAME") || "the private channel",
+    plans: { weekly, monthly } satisfies Record<PlanId, Plan>,
+    dataPath: readOptional("DATA_PATH") || "./data/subscriptions.json",
     nodeEnv: process.env.NODE_ENV?.trim() || "development",
     port: process.env.PORT ? Number(process.env.PORT) : undefined,
-    webhookUrl: process.env.WEBHOOK_URL?.trim() || undefined,
-    webhookSecret: process.env.WEBHOOK_SECRET?.trim() || undefined,
+    webhookUrl: readOptional("WEBHOOK_URL"),
+    webhookSecret: readOptional("WEBHOOK_SECRET"),
   } as const;
 }
 
 export const config = loadConfig();
 export type AppConfig = typeof config;
+
+export function getPlan(id: string): Plan | undefined {
+  if (id === "weekly" || id === "monthly") {
+    return config.plans[id];
+  }
+  return undefined;
+}
